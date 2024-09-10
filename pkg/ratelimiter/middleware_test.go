@@ -97,6 +97,7 @@ func TestMiddleware_Deny(t *testing.T) {
 
 	// Verify
 	assert.Equal(t, w.Code, http.StatusTooManyRequests)
+	assert.Equal(t, rateLimiterMessage, string(w.Body.Bytes()))
 }
 
 func TestIntegrationMiddleware_Allow(t *testing.T) {
