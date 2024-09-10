@@ -30,17 +30,14 @@ func (r *redisStrategy) Inc(ctx context.Context, value string) (int64, error) {
 	key := r.key + value
 
 	p := r.rc.Pipeline()
-	count, err := p.Incr(ctx, key).Result()
+	inc := p.Incr(ctx, key)
+	p.Expire(ctx, key, r.interval)
+	_, err := p.Exec(ctx)
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = p.Expire(ctx, key, r.interval).Result()
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = p.Exec(ctx)
+	count, err := inc.Result()
 	if err != nil {
 		return 0, err
 	}
