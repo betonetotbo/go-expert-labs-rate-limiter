@@ -12,7 +12,7 @@ services:
     image: redis/redisinsight:2.54
     container_name: redisui
     ports:
-      - 8080:5540
+      - 9090:5540
     volumes:
       - redisinsight-data:/data
     networks:

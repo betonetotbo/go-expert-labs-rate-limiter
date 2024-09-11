@@ -9,7 +9,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"log"
 	"net/http"
-	"time"
 )
 
 func main() {
@@ -28,15 +27,18 @@ func main() {
 	var r = chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(ratelimiter.NewMiddleware(
-		ratelimiter.NewRateLimiter(ratelimiter.NewRedisStrategy(rc, "ip", time.Second*1),
-			ratelimiter.NewRedisStrategy(rc, "token", time.Second*1),
-			10,
+		ratelimiter.NewRateLimiter(ratelimiter.NewRedisStrategy(rc, "rate-limiter-by-ip-", cfg.Interval),
+			ratelimiter.NewRedisStrategy(rc, "rate-limiter-by-token-", cfg.Interval),
+			cfg,
 		),
 	))
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("welcome"))
+		_, _ = w.Write([]byte("welcome"))
 	})
 
 	log.Printf("Listening on port %d\n", cfg.Port)
-	http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), r)
+	err = http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), r)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

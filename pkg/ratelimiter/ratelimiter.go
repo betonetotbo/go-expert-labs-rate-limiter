@@ -2,6 +2,7 @@ package ratelimiter
 
 import (
 	"betonetotbo/go-expert-labs-rate-limiter/internal/config"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -36,6 +37,11 @@ func (rl *rateLimiter) Allow(r *http.Request) bool {
 			if found {
 				count, err := rl.tokenStrategy.Inc(r.Context(), token)
 				if err != nil || count > int64(rps) {
+					if err != nil {
+						log.Printf("Failed to apply rating limit rules: %v\n", err)
+					} else {
+						log.Printf("Rate limit exceeded for token '%s' (count %d)\n", token, count)
+					}
 					return false
 				}
 				return true
@@ -44,5 +50,13 @@ func (rl *rateLimiter) Allow(r *http.Request) bool {
 	}
 
 	count, err := rl.ipStrategy.Inc(r.Context(), ip)
-	return err == nil && count <= int64(rl.cfg.Rps)
+	if err != nil {
+		log.Printf("Failed to apply rating limit rules by IP: %v\n", err)
+		return false
+	}
+	allowed := count <= int64(rl.cfg.Rps)
+	if !allowed {
+		log.Printf("Rate limit exceeded for IP '%s' (count %d)\n", ip, count)
+	}
+	return allowed
 }
