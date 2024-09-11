@@ -1,11 +1,13 @@
 package ratelimiter
 
 import (
+	"betonetotbo/go-expert-labs-rate-limiter/internal/config"
 	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 type (
@@ -20,13 +22,14 @@ func (sm *strategyMock) Inc(ctx context.Context, value string) (int64, error) {
 }
 
 func TestRateLimiter_Allow(t *testing.T) {
-	tsm := &strategyMock{}
-	tsm.On("Inc", mock.Anything, "token").Return(int64(1), nil)
+	// Assemble
+	tokenStrategyMock := &strategyMock{}
+	tokenStrategyMock.On("Inc", mock.Anything, "token").Return(int64(1), nil)
 
-	ism := &strategyMock{}
-	ism.On("Inc", mock.Anything, "127.0.0.1").Return(int64(1), nil)
+	ipStrategyMock := &strategyMock{}
+	ipStrategyMock.On("Inc", mock.Anything, "127.0.0.1").Return(int64(1), nil)
 
-	rm := NewRateLimiter(ism, tsm, 10)
+	rm := NewRateLimiter(ipStrategyMock, tokenStrategyMock, &config.Config{Rps: 10, Interval: time.Minute})
 
 	r := httptest.NewRequest("GET", "/", nil)
 	r.RemoteAddr = "127.0.0.1"
@@ -40,17 +43,26 @@ func TestRateLimiter_Allow(t *testing.T) {
 }
 
 func TestRateLimiter_DenyByIp(t *testing.T) {
-	tsm := &strategyMock{}
-	tsm.On("Inc", mock.Anything, "token").Return(int64(1), nil)
+	// Assemble
+	tokenStrategyMock := &strategyMock{}
+	tokenStrategyMock.On("Inc", mock.Anything, mock.Anything).Panic("call not expected")
 
-	ism := &strategyMock{}
-	ism.On("Inc", mock.Anything, "127.0.0.1").Return(int64(11), nil)
+	ipStrategyMock := &strategyMock{}
+	ipStrategyMock.On("Inc", mock.Anything, "127.0.0.1").Return(int64(11), nil)
 
-	rm := NewRateLimiter(ism, tsm, 10)
+	rm := NewRateLimiter(ipStrategyMock, tokenStrategyMock, &config.Config{
+		Rps:      10,
+		Interval: time.Minute,
+		TokenRps: config.TokenRps{
+			Values: map[string]int{
+				"token": 10,
+			},
+		},
+	})
 
 	r := httptest.NewRequest("GET", "/", nil)
 	r.RemoteAddr = "127.0.0.1"
-	r.Header.Set("API_KEY", "token")
+	r.Header.Set("API_KEY", "token2")
 
 	// Act
 	allow := rm.Allow(r)
@@ -60,13 +72,22 @@ func TestRateLimiter_DenyByIp(t *testing.T) {
 }
 
 func TestRateLimiter_DenyByToken(t *testing.T) {
-	tsm := &strategyMock{}
-	tsm.On("Inc", mock.Anything, "token").Return(int64(11), nil)
+	// Assemble
+	tokenStrategyMock := &strategyMock{}
+	tokenStrategyMock.On("Inc", mock.Anything, "token").Return(int64(11), nil)
 
-	ism := &strategyMock{}
-	ism.On("Inc", mock.Anything, "127.0.0.1").Return(int64(1), nil)
+	ipStrategyMock := &strategyMock{}
+	ipStrategyMock.On("Inc", mock.Anything, mock.Anything).Panic("call not expected")
 
-	rm := NewRateLimiter(ism, tsm, 10)
+	rm := NewRateLimiter(ipStrategyMock, tokenStrategyMock, &config.Config{
+		Rps:      10,
+		Interval: time.Minute,
+		TokenRps: config.TokenRps{
+			Values: map[string]int{
+				"token": 10,
+			},
+		},
+	})
 
 	r := httptest.NewRequest("GET", "/", nil)
 	r.RemoteAddr = "127.0.0.1"

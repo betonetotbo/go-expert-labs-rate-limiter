@@ -11,7 +11,7 @@ func NewMiddleware(limiter RateLimiter) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !limiter.Allow(r) {
 				w.WriteHeader(http.StatusTooManyRequests)
-				w.Write([]byte(rateLimiterMessage))
+				_, _ = w.Write([]byte(rateLimiterMessage))
 				return
 			}
 			next.ServeHTTP(w, r)
